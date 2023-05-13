@@ -88,7 +88,7 @@ class Login {
     * 
     * @return void
     */
-    public function init($path) {
+    public function init($path="/") {
         $this->_urlPath=$path;
         $secure = !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off';
         // Start the session
@@ -99,7 +99,7 @@ class Login {
             'secure' => $secure,
             'httponly' => $secure
         ]);
-        session_start(['cookie_secure' => true,'cookie_httponly' => true]);
+        session_start(['cookie_secure' => $secure,'cookie_httponly' => $secure]);
         // Check if user is already logged in using a cookie
         if (isset($_COOKIE[$this->_cookieName]) && !$this->isLoggedIn()) {
             // Get the hash from the cookie
