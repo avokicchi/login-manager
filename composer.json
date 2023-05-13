@@ -1,0 +1,11 @@
+{
+    "require": {
+        "php": ">=7.2"
+    },
+    "autoload": {
+        "psr-0": {
+            "Rawrfle":        "src"
+        }
+    },
+    "minimum-stability": "dev"
+}
