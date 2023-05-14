@@ -18,6 +18,7 @@ To load the library.
 - Secure pages requiring fresh login
 - Database agnostic, uses PDO
 - No other libraries or dependencies needed
+- Simple Key/Value storage on login object that lasts for the duration of the login session in case you need to remember something during login.
 
 **Requirements**
  - php 7.2+
@@ -30,6 +31,6 @@ If you want that kind of functionality, I would at the moment probably recommend
 
 I hope this is useful to anyone. ~ Avo
 
-For a simple usage example, see Examples/Test1.php. 
+For simple usage examples, see the Examples/ folder.
 
 In the future, I will create a small demo project that goes into more detail and shows how to use this library with dependency injection.

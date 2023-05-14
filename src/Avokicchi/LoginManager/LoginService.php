@@ -13,7 +13,7 @@ class LoginService {
     private $_cookieName = null;
     private $_cookiePath = null;
     private $_urlPath="/";
-    private $_sessionLifetime=60;//30 minutes. 1800
+    private $_sessionLifetime=1800;
     private $_pdo=null;
 
     private $_dbTable = "users";
@@ -305,7 +305,7 @@ class LoginService {
         $data = [
             "user_id" => $userId,
             "last_activity" => time(),
-            "bag" => $_SESSION['bag']
+            "bag" => isset($_SESSION['bag']) ? $_SESSION['bag'] : []
         ];
         $cookieHash = preg_replace("/[^A-Za-z0-9]/", '', $cookieHash);
         $cookieFile = $this->_cookiePath. $cookieHash . ".txt"; 
