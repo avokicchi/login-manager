@@ -26,7 +26,8 @@ $login_service->setUserTableName("user");//it defaults to "users", here we overr
 $login_service->setUserField("username","email");
 
 if($_SERVER['REQUEST_METHOD']=="POST"){
-    if($login_service->login($_POST['username'],$_POST['password'],true)){
+    $remember_me = isset($_POST['remember_me']) && $_POST['remember_me']=="on";
+    if($login_service->login($_POST['username'],$_POST['password'],$remember_me)){
         $user = $login_service->getUser();
         echo "Hi, you were successfully logged in:";
         echo '<pre>';
@@ -41,6 +42,7 @@ if($_SERVER['REQUEST_METHOD']=="POST"){
         <input type="text" name="username"/><br/>
         Password:<br/>
         <input type="password" name="password"/><br/>
+        <label><input type="checkbox" name="remember_me" value="on"/> Remember me</label>
         <input type="submit" value="login"/>
     </form>
     <?php
