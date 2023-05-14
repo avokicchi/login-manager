@@ -1,6 +1,7 @@
 Drop-in PHP login module that's database agnostic, doesn't require any libraries, and supports remember-me functionality.
 
 **Installation using Composer**
+
 Run:
 	
 	composer require avokicchi/login-manager
