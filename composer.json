@@ -1,4 +1,6 @@
 {
+    "name": "avokicchi/login-manager",
+    "description": "Drop-in PHP login module that's database agnostic, doesn't require any libraries, and supports remember-me functionality.",
     "require": {
         "php": ">=7.2"
     },
