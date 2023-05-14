@@ -20,42 +20,5 @@ Hope this is useful to anyone. ~ Avo
 
 NOT ANYWHERE NEAR PRODUCTION READY, DO NOT USE IN YOUR PROJECTS.
 
-Crappy usage example with slim framework dependency injection:
-
-in your index.php/web accessible index page, etc:
-
-	require_once 'vendor/autoload.php';
-	$app->container->singleton(
-	    'login',
-	    function ($container) use ($pdo) {
-	        global $config;
-	        return new \Avokicchi\LoginManager\LoginService($pdo,"_someidx");
-	    }
-	);
-	$app->container['login']->init("/");
-	$app->container['login']->setUserTableName("user");
-	$app->container['login']->setUserField("username","email");
-
-logout function:
-
-    public function logout()
-    {
-        $app = \Slim\Slim::getInstance();
-        $app->container['login']->logout();
-        return $this->redirect("/");
-    }
-
-login function:
-
-    public function login()
-    {     
-        $app = \Slim\Slim::getInstance();
-        if($_SERVER['REQUEST_METHOD']=="POST"){
-            if(!$app->container['login']->login($_POST['username'],$_POST['password'],true)){
-                die($app->container['login']->getLastError());
-            }
-            return $this->redirect("/");
-        } else {
-            return $app->render("login.html", []);/show a login form with a username and password field that posts the form to this exact page with method=post
-        }
-    }
+For a simple usage example, see Examples/Test1.php.
+I will create a small demo project later on that goes into more detail.

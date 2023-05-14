@@ -244,6 +244,7 @@ class LoginService {
     */
     public function verify($username, $password) {
         // Query database for user with matching username
+        $username=trim($username);
         $stmt = $this->_pdo->prepare("SELECT * FROM ".$this->_dbTable." WHERE ".$this->_dbFields["username"]." = :username");
         $stmt->execute([":username" => $username]);
         $user = $stmt->fetch(\PDO::FETCH_ASSOC);
@@ -273,6 +274,7 @@ class LoginService {
     * @return integer
     */
     private function getUserIdByUsername($username) {
+        $username=trim($username);
         // Query the database for the user ID
         $stmt = $this->_pdo->prepare("SELECT * FROM ".$this->_dbTable." WHERE ".$this->_dbFields["username"]." = :username");
         $stmt->execute([":username" => $username]);
@@ -295,6 +297,7 @@ class LoginService {
     * @return bool
     */
     public function login($username, $password, $rememberMe) {
+        $username=trim($username);
         // Verify the username and password
         if (!$this->verify($username, $password)) {
             return false;
