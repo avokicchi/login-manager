@@ -1,24 +1,35 @@
-Drop-in PHP login module that's database agnostic, doesn't require any libraries, and supports remember-me functionality. 
+Drop-in PHP login module that's database agnostic, doesn't require any libraries, and supports remember-me functionality.
 
-NOT ANYWHERE NEAR PRODUCTION READY, DO NOT USE IN YOUR PROJECTS.
+**Installation using Composer**
 
-Installation is simple
+Run:
+	
+	composer require avokicchi/login-manager
+	
+Then use:
+		
+	require_once 'vendor/autoload.php';
+	
+To load the library.
 
-composer require avokicchi/login-manager
+**Features**
+- Simple to add to existing projects
+- Remember Me functionality (extend  login session lifetime using cookies)
+- Secure pages requiring fresh login
+- Database agnostic, uses PDO
+- No other libraries or dependencies needed
 
-features:
-- regular login
-- drop in any project, database agnostic.
+**Requirements**
+ - php 7.2+
+ - PDO database connection
 
-I will never extend this library with password recovery, email validation, or two-factor authentication as that goes way beyond the scope of this and would require including libraries and defeats the point of this, which is to provide a simple login system for simple projects. You can always build on top of it to provide all that yourself. I would at the moment probably recommend phpgangsta/googleauthenticator for two factor auth, and mandrill/mailchimp or mailgun for your email needs.
+**Notes**
+I will not extend this library with password recovery, email validation, or two-factor authentication as that goes way beyond the scope of this and would require including libraries and defeats the point of this, which is to provide a simple login system for simple (personal use) projects, or a basic login system to build on top of. 
 
-requirements:
-- php 7.2+
-- database that works with pdo
+If you want that kind of functionality, I would at the moment probably recommend phpgangsta/googleauthenticator for two factor authentication, and mandrill, mailchimp or mailgun for your email sending needs.
 
-Hope this is useful to anyone. ~ Avo
+I hope this is useful to anyone. ~ Avo
 
-NOT ANYWHERE NEAR PRODUCTION READY, DO NOT USE IN YOUR PROJECTS.
+For a simple usage example, see Examples/Test1.php. 
 
-For a simple usage example, see Examples/Test1.php.
-I will create a small demo project later on that goes into more detail.
+In the future, I will create a small demo project that goes into more detail and shows how to use this library with dependency injection.
