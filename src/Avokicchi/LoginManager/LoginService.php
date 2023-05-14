@@ -35,9 +35,11 @@ class LoginService {
     */
     function __construct($pdo,$cookieName="_youridx") {
         $this->_pdo=$pdo;
-        $this->_cookiePath = __DIR__."/../cache/sessions/";//outside your publicly shared documentroot.
-        $this->cookieName = $cookieName;
-        @mkdir($this->_cookiePath);
+        $this->_cookiePath = __DIR__.DIRECTORY_SEPARATOR."..".DIRECTORY_SEPARATOR."..".DIRECTORY_SEPARATOR."..".DIRECTORY_SEPARATOR."cache".DIRECTORY_SEPARATOR."sessions".DIRECTORY_SEPARATOR;//outside your publicly shared documentroot.
+        $this->_cookieName = $cookieName;
+        $this->_cookiePath=str_replace("\\", "/", $this->_cookiePath);
+        $this->_cookiePath = $path;
+        @mkdir($this->_cookiePath,0777,true);
     }
 
     /**
