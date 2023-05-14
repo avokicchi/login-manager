@@ -38,7 +38,6 @@ class LoginService {
         $this->_cookiePath = __DIR__.DIRECTORY_SEPARATOR."..".DIRECTORY_SEPARATOR."..".DIRECTORY_SEPARATOR."..".DIRECTORY_SEPARATOR."cache".DIRECTORY_SEPARATOR."sessions".DIRECTORY_SEPARATOR;//outside your publicly shared documentroot.
         $this->_cookieName = $cookieName;
         $this->_cookiePath=str_replace("\\", "/", $this->_cookiePath);
-        $this->_cookiePath = $path;
         @mkdir($this->_cookiePath,0777,true);
     }
 
@@ -105,19 +104,19 @@ class LoginService {
         // Check if user is already logged in using a cookie
         if (isset($_COOKIE[$this->_cookieName]) && !$this->isLoggedIn()) {
             // Get the hash from the cookie
-            $cookie_hash = $_COOKIE[$this->_cookieName];
-            $cookie_hash = preg_replace("/[^A-Za-z0-9]/", '', $cookie_hash);
-            $last_activity = $this->getLastActivityFromCookie($cookie_hash);
-            $week_ago = time() - (7 * 24 * 60 * 60);
-            if ($last_activity < $week_ago) {
+            $cookieHash = $_COOKIE[$this->_cookieName];
+            $cookieHash = preg_replace("/[^A-Za-z0-9]/", '', $cookieHash);
+            $lastActivity = $this->getLastActivityFromCookie($cookieHash);
+            $weekAgo = time() - (7 * 24 * 60 * 60);
+            if ($lastActivity < $weekAgo) {
                 $this->logout();
             } else {
-                // Retrieve the user_id from the server file
-                $user_id = $this->getUserIDFromCookie($cookie_hash);
-                $this->clearCookie($cookie_hash);
-                // If user_id exists, log the user in programmatically
-                if ($user_id) {
-                    $this->programmaticLogin($user_id, true);
+                // Retrieve the userId from the server file
+                $userId = $this->getUserIDFromCookie($cookieHash);
+                $this->clearCookie($cookieHash);
+                // If userId exists, log the user in programmatically
+                if ($userId) {
+                    $this->programmaticLogin($userId, true);
                 }
                 $_SESSION['secure'] = false;
             }
@@ -151,32 +150,32 @@ class LoginService {
     /**
     * Generates a hash to store the cookie with
     *
-    * @param int $user_id  The user ID
+    * @param int $userId   The user ID
     * 
     * @return string       The hash
     */
-    private function generateCookieHash($user_id) {
+    private function generateCookieHash($userId) {
         $keyspace = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
         $token = '';
         $max = mb_strlen($keyspace, '8bit') - 1;
         for ($i = 0; $i < 16; ++$i) {
             $token .= $keyspace[random_int(0, $max)];
         }
-        return hash('sha256', $user_id . $token . $this->_hashSecret);
+        return hash('sha256', $userId . $token . $this->_hashSecret);
     }
 
     /**
     * Retrieves the user's ID from the cookie
     *
-    * @param string $cookie_hash  The hash for the the cookie filename
+    * @param string $cookieHash   The hash for the the cookie filename
     * 
     * @return int|bool            The user ID or false if the hash is invalid or the file doesn't exist
     */
-    private function getUserIDFromCookie($cookie_hash) {
-        $cookie_hash = preg_replace("/[^A-Za-z0-9]/", '', $cookie_hash);
-        $cookie_file = $this->_cookiePath. $cookie_hash . ".txt"; 
-        if (file_exists($cookie_file)) {
-            $bits = file_get_contents($cookie_file);
+    private function getUserIDFromCookie($cookieHash) {
+        $cookieHash = preg_replace("/[^A-Za-z0-9]/", '', $cookieHash);
+        $cookieFile = $this->_cookiePath. $cookieHash . ".txt"; 
+        if (file_exists($cookieFile)) {
+            $bits = file_get_contents($cookieFile);
             $bits = explode("|",$bits);
             return intval($bits[0]);
         } else {
@@ -187,15 +186,15 @@ class LoginService {
     /**
     * Retrieves the user's last activity timestamp from the cookie
     *
-    * @param string $cookie_hash  The hash for the the cookie filename
+    * @param string $cookieHash     The hash for the the cookie filename
     * 
-    * @return bool            Whether something was removed or not.
+    * @return bool                  Whether something was removed or not.
     */
-    private function clearCookie($cookie_hash) {
-        $cookie_hash = preg_replace("/[^A-Za-z0-9]/", '', $cookie_hash);
-        $cookie_file = $this->_cookiePath. $cookie_hash . ".txt"; 
-        if (file_exists($cookie_file)) {
-            @unlink($cookie_file);
+    private function clearCookie($cookieHash) {
+        $cookieHash = preg_replace("/[^A-Za-z0-9]/", '', $cookieHash);
+        $cookieFile = $this->_cookiePath. $cookieHash . ".txt"; 
+        if (file_exists($cookieFile)) {
+            @unlink($cookieFile);
             return true;
         } else {
             return false;
@@ -205,15 +204,15 @@ class LoginService {
     /**
      * Retrieves the user's last activity timestamp from the cookie
      *
-     * @param string $cookie_hash  The hash for the the cookie filename
+     * @param string $cookieHash   The hash for the the cookie filename
      * 
      * @return int|bool            The last activity timestamp or false if the hash is invalid or the file doesn't exist
      */
-    private function getLastActivityFromCookie($cookie_hash) {
-        $cookie_hash = preg_replace("/[^A-Za-z0-9]/", '', $cookie_hash);
-        $cookie_file = $this->_cookiePath. $cookie_hash . ".txt"; 
-        if (file_exists($cookie_file)) {
-            $bits = file_get_contents($cookie_file);
+    private function getLastActivityFromCookie($cookieHash) {
+        $cookieHash = preg_replace("/[^A-Za-z0-9]/", '', $cookieHash);
+        $cookieFile = $this->_cookiePath. $cookieHash . ".txt"; 
+        if (file_exists($cookieFile)) {
+            $bits = file_get_contents($cookieFile);
             $bits = explode("|",$bits);
             return intval($bits[1]);
         } else {
@@ -224,15 +223,15 @@ class LoginService {
     /**
      * Saves the user's id and current time in a file on the server with the hash as the file name.
      *
-     * @param int $user_id  The user ID
-     * @param string $cookie_hash  The cookie hash
+     * @param int $userId           The user ID
+     * @param string $cookieHash    The cookie hash
      * 
      * @return void
      */
-    private function saveUserIDInCookieFile($user_id,$cookie_hash) {
-        $cookie_hash = preg_replace("/[^A-Za-z0-9]/", '', $cookie_hash);
-        $cookie_file = $this->_cookiePath. $cookie_hash . ".txt"; 
-        file_put_contents($cookie_file, $user_id. "|" . time());
+    private function saveUserIDInCookieFile($userId,$cookieHash) {
+        $cookieHash = preg_replace("/[^A-Za-z0-9]/", '', $cookieHash);
+        $cookieFile = $this->_cookiePath. $cookieHash . ".txt"; 
+        file_put_contents($cookieFile, $userId. "|" . time());
     }
 
     /**
@@ -256,12 +255,12 @@ class LoginService {
                 return true;
             } else {
                 // Password is incorrect
-                $this->setLastError("error_login_username_password_combination_not_found");
+                $this->setLastError("Login details incorrect.");
                 return false;
             }
         } else {
             // User not found
-            $this->setLastError("error_login_username_not_found");
+            $this->setLastError("User not found.");
             return false;
         }
     }
@@ -291,18 +290,18 @@ class LoginService {
     * 
     * @param string $username   The username
     * @param string $password   The password
-    * @param bool $remember_me  Extend login lifetime using cookies.
+    * @param bool $rememberMe   Extend login lifetime using cookies.
     * 
     * @return bool
     */
-    public function login($username, $password, $remember_me) {
+    public function login($username, $password, $rememberMe) {
         // Verify the username and password
         if (!$this->verify($username, $password)) {
             return false;
         }
         // Get the user ID
         $user_id = $this->getUserIdByUsername($username);
-        $this->programmaticLogin($user_id,$remember_me);
+        $this->programmaticLogin($user_id,$rememberMe);
         $_SESSION['secure'] = true;
         return true;
     }
@@ -310,22 +309,22 @@ class LoginService {
     /**
     * Performs the actions that log the user in. Can also be used to programatically force a login, for instance if you implement security challenges with 2fa.
     * 
-    * @param integer    $user_id  The user's ID.
-    * @param bool       $remember_me  Extend login lifetime using cookies.
+    * @param integer    $userId         The user's ID.
+    * @param bool       $rememberMe     Extend login lifetime using cookies.
     * 
     * @return void
     */
-    public function programmaticLogin($user_id, $remember_me) {
-        $user_id=(int)$user_id;
+    public function programmaticLogin($userId, $rememberMe) {
+        $userId=(int)$userId;
         // Set session variables
-        $_SESSION['user_id'] = $user_id;
+        $_SESSION['user_id'] = $userId;
         $_SESSION['user_agent'] = $_SERVER['HTTP_USER_AGENT'];
         $_SESSION['ip'] = $_SERVER['REMOTE_ADDR'];
         // Set cookie
-        if ($remember_me) {
-            $cookie_hash = $this->generateCookieHash($user_id);
-            $this->saveUserIDInCookieFile($user_id,$cookie_hash);
-            setcookie($this->_cookieName, $cookie_hash, time() + 60 * 60 * 24 * 30, $this->_urlPath);
+        if ($rememberMe) {
+            $cookieHash = $this->generateCookieHash($userId);
+            $this->saveUserIDInCookieFile($userId,$cookieHash);
+            setcookie($this->_cookieName, $cookieHash, time() + 60 * 60 * 24 * 30, $this->_urlPath);
         }
     }
 
@@ -345,9 +344,9 @@ class LoginService {
             $params["secure"], 
             $params["httponly"]
         );
-        $cookie_hash = is_array($_COOKIE) && array_key_exists($this->_cookieName,$_COOKIE) ? $_COOKIE[$this->_cookieName] :  null;
-        if(!empty($cookie_hash)) {
-            $this->clearCookie($cookie_hash);
+        $cookieHash = is_array($_COOKIE) && array_key_exists($this->_cookieName,$_COOKIE) ? $_COOKIE[$this->_cookieName] :  null;
+        if(!empty($cookieHash)) {
+            $this->clearCookie($cookieHash);
         }
         // Delete remember me cookie
         setcookie($this->_cookieName, '', time() - 3600,$this->_urlPath);
@@ -364,10 +363,10 @@ class LoginService {
         // Check if user is logged in
         if ($this->isLoggedIn()) {
             // Get user id from session
-            $user_id = $_SESSION['user_id'];
+            $userId = $_SESSION['user_id'];
             // Query database for user details
             $stmt = $this->_pdo->prepare("SELECT * FROM ".$this->_dbTable." WHERE ".$this->_dbFields["id"]." = :user_id");
-            $stmt->execute([":user_id" => $user_id]);
+            $stmt->execute([":user_id" => $userId]);
             $user = $stmt->fetch(\PDO::FETCH_ASSOC);
             // Return user details as associative array
             return $user;
