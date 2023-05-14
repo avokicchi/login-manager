@@ -13,7 +13,7 @@ class LoginService {
     private $_cookieName = null;
     private $_cookiePath = null;
     private $_urlPath="/";
-    private $_cookeLifetime=1800;
+    private $_cookeLifetime=1800;//30 minutes
     private $_hashSecret="any_secret_key";
     private $_pdo=null;
 
@@ -24,6 +24,8 @@ class LoginService {
         "username" => "username",
         "password" => "password"
     ];
+
+    private $_inactivityTimeout = 7 * 24 * 60 * 60;//one week
 
     /**
     * Instantiates the Login class.
@@ -72,6 +74,18 @@ class LoginService {
     }
 
     /**
+    * Set inactivity timeout
+    *
+    * @param integer $timeout  Inactivity time (not accessing the website)in seconds after which the user should be logged out.
+    * This value is also used to set the cookie lifetime. If used, it should be set before init.
+    * 
+    * @return void
+    */
+    public function setInactivityTimeout($timeout) {
+        $this->_inactivityTimeout = $timeout;
+    }
+
+    /**
     * Function for extra secure pages. Determines whether your login is the result of a login, 
     * or by an extension of lifetime by a cookie, which is inherently less secure. 
     * You can use this to ask for an extra login action on an extra secure page.
@@ -107,7 +121,7 @@ class LoginService {
             $cookieHash = $_COOKIE[$this->_cookieName];
             $cookieHash = preg_replace("/[^A-Za-z0-9]/", '', $cookieHash);
             $lastActivity = $this->getLastActivityFromCookie($cookieHash);
-            $weekAgo = time() - (7 * 24 * 60 * 60);
+            $weekAgo = time() - $this->_inactivityTimeout;
             if ($lastActivity < $weekAgo) {
                 $this->logout();
             } else {
@@ -327,7 +341,7 @@ class LoginService {
         if ($rememberMe) {
             $cookieHash = $this->generateCookieHash($userId);
             $this->saveUserIDInCookieFile($userId,$cookieHash);
-            setcookie($this->_cookieName, $cookieHash, time() + 60 * 60 * 24 * 30, $this->_urlPath);
+            setcookie($this->_cookieName, $cookieHash, time() + $this->_inactivityTimeout, $this->_urlPath);
         }
     }
 
