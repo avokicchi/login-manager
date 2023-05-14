@@ -1,13 +1,13 @@
 <?php
 
-namespace Rawrfle;
+namespace Avokicchi\LoginManager;
 
 /**
- * Class Login
+ * Class LoginService
  *
  * Extended login module with cookie session restore
  */
-class Login {
+class LoginService {
 
     private $_template;
     private $_cookieName = null;
