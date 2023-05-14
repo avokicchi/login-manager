@@ -13,8 +13,7 @@ class LoginService {
     private $_cookieName = null;
     private $_cookiePath = null;
     private $_urlPath="/";
-    private $_cookeLifetime=1800;//30 minutes
-    private $_hashSecret="any_secret_key";
+    private $_sessionLifetime=60;//30 minutes. 1800
     private $_pdo=null;
 
     private $_dbTable = "users";
@@ -41,6 +40,55 @@ class LoginService {
         $this->_cookieName = $cookieName;
         $this->_cookiePath=str_replace("\\", "/", $this->_cookiePath);
         @mkdir($this->_cookiePath,0777,true);
+    }
+
+    /**
+    * Stores a key/value pair for the duration of your login session.
+    *
+    * @param string $key    The key
+    * @param string $value  The value
+    * 
+    * @return void
+    */
+    public function set($key,$value) {
+        if($this->isLoggedIn()) {
+            $bag = $_SESSION['bag'];
+            $_SESSION['bag'][$key] = $value;
+            // There's only a cookie if Remember Me is on.
+            if(isset($_COOKIE) && array_key_exists($this->_cookieName,$_COOKIE)) {
+                $cookieHash = $_COOKIE[$this->_cookieName];
+                $cookieHash = preg_replace("/[^A-Za-z0-9]/", '', $cookieHash);
+                $this->writeCookieData($cookieHash);
+            }
+        }
+    }
+
+    /**
+    * Returns the value for a key for something you assigned with set()
+    *
+    * @param string $key    The key
+    * 
+    * @return mixed
+    */
+    public function get($key) {
+        if($this->isLoggedIn()) {
+            // Try to get from session, if not, then from cookie.
+            $bag = isset($_SESSION['bag']) && !empty($_SESSION['bag']) && array_key_exists($key,$_SESSION['bag']) ? $_SESSION['bag'] : null;
+            if(!empty($bag)) return $bag[$key];
+            $cookieHash = array_key_exists($this->_cookieName,$_COOKIE) ? $_COOKIE[$this->_cookieName] : null;
+            if(empty($cookieHash)) Return null;
+            $cookieHash = preg_replace("/[^A-Za-z0-9]/", '', $cookieHash);
+            $cookieFile = $this->_cookiePath. $cookieHash . ".txt"; 
+            if (file_exists($cookieFile)) {
+                $data = unserialize(file_get_contents($cookieFile));
+                $bag =  $data["bag"];
+                return array_key_exists($key,$bag) ? $bag[$key] : null;
+            } else {
+                return null;
+            }
+        } else {
+            return null;
+        }
     }
 
     /**
@@ -107,19 +155,21 @@ class LoginService {
         $this->_urlPath=$path;
         $secure = !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off';
         // Start the session
-        ini_set('session.cookie_lifetime', $this->_cookeLifetime);
+        ini_set('session.cookie_lifetime', $this->_sessionLifetime);
         session_set_cookie_params([
-            'lifetime' => $this->_cookeLifetime,
+            'lifetime' => $this->_sessionLifetime,
             'path' => $path==null ? '/' : $path,
             'secure' => $secure,
             'httponly' => $secure
         ]);
         session_start(['cookie_secure' => $secure,'cookie_httponly' => $secure]);
-        // Check if user is already logged in using a cookie
+        // If user is not logged in with a session, but there is a cookie present,
+        // Check if user is validly logged in using a cookie
         if (isset($_COOKIE[$this->_cookieName]) && !$this->isLoggedIn()) {
             // Get the hash from the cookie
             $cookieHash = $_COOKIE[$this->_cookieName];
             $cookieHash = preg_replace("/[^A-Za-z0-9]/", '', $cookieHash);
+            // Log user out after a week of no activity.
             $lastActivity = $this->getLastActivityFromCookie($cookieHash);
             $weekAgo = time() - $this->_inactivityTimeout;
             if ($lastActivity < $weekAgo) {
@@ -127,17 +177,17 @@ class LoginService {
             } else {
                 // Retrieve the userId from the server file
                 $userId = $this->getUserIDFromCookie($cookieHash);
-                $this->clearCookie($cookieHash);
                 // If userId exists, log the user in programmatically
+                $_SESSION['bag'] = $this->getBagFromCookie($cookieHash);
+                $this->clearCookie($cookieHash);//old cookie, new one is already there
                 if ($userId) {
                     $this->programmaticLogin($userId, true);
                 }
                 $_SESSION['secure'] = false;
             }
-
         }
         if(!$this->isLoggedIn()) {
-            session_regenerate_id();//regenerate session cookie with correct expiration. seems to work
+            @session_regenerate_id();// regenerate session cookie with correct expiration. seems to work to resolve PHP assigning random session expiration times sometimes...
         }
     }
 
@@ -175,7 +225,7 @@ class LoginService {
         for ($i = 0; $i < 16; ++$i) {
             $token .= $keyspace[random_int(0, $max)];
         }
-        return hash('sha256', $userId . $token . $this->_hashSecret);
+        return hash('sha256', $userId . $token);
     }
 
     /**
@@ -189,9 +239,8 @@ class LoginService {
         $cookieHash = preg_replace("/[^A-Za-z0-9]/", '', $cookieHash);
         $cookieFile = $this->_cookiePath. $cookieHash . ".txt"; 
         if (file_exists($cookieFile)) {
-            $bits = file_get_contents($cookieFile);
-            $bits = explode("|",$bits);
-            return intval($bits[0]);
+            $data = unserialize(file_get_contents($cookieFile));
+            return intval($data["user_id"]);
         } else {
             return false;
         }
@@ -226,26 +275,41 @@ class LoginService {
         $cookieHash = preg_replace("/[^A-Za-z0-9]/", '', $cookieHash);
         $cookieFile = $this->_cookiePath. $cookieHash . ".txt"; 
         if (file_exists($cookieFile)) {
-            $bits = file_get_contents($cookieFile);
-            $bits = explode("|",$bits);
-            return intval($bits[1]);
+            $data = unserialize(file_get_contents($cookieFile));
+            return intval($data["last_activity"]);
+        } else {
+            return false;
+        }
+    }
+
+    private function getBagFromCookie($cookieHash) {
+        $cookieHash = preg_replace("/[^A-Za-z0-9]/", '', $cookieHash);
+        $cookieFile = $this->_cookiePath. $cookieHash . ".txt"; 
+        if (file_exists($cookieFile)) {
+            $data = unserialize(file_get_contents($cookieFile));
+            return $data["bag"];
         } else {
             return false;
         }
     }
 
     /**
-     * Saves the user's id and current time in a file on the server with the hash as the file name.
+     * Saves the user's id and current time and key/value storage bag in a file on the server with the hash as the file name.
      *
-     * @param int $userId           The user ID
      * @param string $cookieHash    The cookie hash
      * 
      * @return void
      */
-    private function saveUserIDInCookieFile($userId,$cookieHash) {
+    private function writeCookieData($cookieHash) {
+        $userId=$_SESSION['user_id'];
+        $data = [
+            "user_id" => $userId,
+            "last_activity" => time(),
+            "bag" => $_SESSION['bag']
+        ];
         $cookieHash = preg_replace("/[^A-Za-z0-9]/", '', $cookieHash);
         $cookieFile = $this->_cookiePath. $cookieHash . ".txt"; 
-        file_put_contents($cookieFile, $userId. "|" . time());
+        file_put_contents($cookieFile, serialize($data));
     }
 
     /**
@@ -320,6 +384,7 @@ class LoginService {
         $user_id = $this->getUserIdByUsername($username);
         $this->programmaticLogin($user_id,$rememberMe);
         $_SESSION['secure'] = true;
+        $_SESSION['bag'] = [];
         return true;
     }
 
@@ -340,7 +405,7 @@ class LoginService {
         // Set cookie
         if ($rememberMe) {
             $cookieHash = $this->generateCookieHash($userId);
-            $this->saveUserIDInCookieFile($userId,$cookieHash);
+            $this->writeCookieData($cookieHash);
             setcookie($this->_cookieName, $cookieHash, time() + $this->_inactivityTimeout, $this->_urlPath);
         }
     }
