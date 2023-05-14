@@ -4,7 +4,7 @@ NOT ANYWHERE NEAR PRODUCTION READY, DO NOT USE IN YOUR PROJECTS.
 
 Installation is simple
 
-composer require avokicchi/rawrfle-login
+composer require avokicchi/login-manager
 
 features:
 - regular login
@@ -29,7 +29,7 @@ in your index.php/web accessible index page, etc:
 	    'login',
 	    function ($container) use ($pdo) {
 	        global $config;
-	        return new \Rawrfle\Login($pdo,"_someidx");
+	        return new \Avokicchi\LoginManager\LoginService($pdo,"_someidx");
 	    }
 	);
 	$app->container['login']->init("/");
