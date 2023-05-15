@@ -168,6 +168,7 @@ class LoginService {
         session_start(['cookie_secure' => $secure,'cookie_httponly' => $secure]);
         // If user is not logged in with a session, but there is a cookie present,
         // Check if user is validly logged in using a cookie
+
         if (isset($_COOKIE[$this->_cookieName]) && !$this->isLoggedIn()) {
             // Get the hash from the cookie
             $cookieHash = $_COOKIE[$this->_cookieName];
@@ -182,7 +183,7 @@ class LoginService {
                 $userId = $this->getUserIDFromCookie($cookieHash);
                 // If userId exists, log the user in programmatically
                 $_SESSION['bag'] = $this->getBagFromCookie($cookieHash);
-                $this->clearCookie($cookieHash);//old cookie, new one is already there
+                $this->clearCookie($cookieHash,"used");//old cookie, new one is already there
                 if ($userId) {
                     $this->programmaticLogin($userId, true);
                 }
@@ -256,7 +257,7 @@ class LoginService {
     * 
     * @return bool                  Whether something was removed or not.
     */
-    private function clearCookie($cookieHash) {
+    private function clearCookie($cookieHash,$reason=null) {
         $cookieHash = preg_replace("/[^A-Za-z0-9]/", '', $cookieHash);
         $cookieFile = $this->_cookiePath. $cookieHash . ".txt"; 
         if (file_exists($cookieFile)) {
@@ -431,7 +432,7 @@ class LoginService {
         );
         $cookieHash = is_array($_COOKIE) && array_key_exists($this->_cookieName,$_COOKIE) ? $_COOKIE[$this->_cookieName] :  null;
         if(!empty($cookieHash)) {
-            $this->clearCookie($cookieHash);
+            $this->clearCookie($cookieHash,"logout");
         }
         // Delete remember me cookie
         setcookie($this->_cookieName, '', time() - 3600,$this->_urlPath,$this->_cookieDomain);
@@ -486,9 +487,9 @@ class LoginService {
     */
     public function isLoggedIn() {
         // Check if user ID is set in session
-        if (isset($_SESSION['user_id']) && isset($_SESSION['ip'])) {
+        if (isset($_SESSION['user_id'])) {
             // Verify user agent/ip
-            if ($_SESSION['user_agent'] === $_SERVER['HTTP_USER_AGENT'] && $_SESSION['ip']===$_SERVER['REMOTE_ADDR']) {
+            if (isset($_SESSION['ip']) && isset($_SESSION['user_agent']) && $_SESSION['user_agent'] === $_SERVER['HTTP_USER_AGENT'] && $_SESSION['ip']===$_SERVER['REMOTE_ADDR']) {
                 // User is logged in
                 return true;
             } else {
