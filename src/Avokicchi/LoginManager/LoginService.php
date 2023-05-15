@@ -12,6 +12,7 @@ class LoginService {
     private $_template;
     private $_cookieName = null;
     private $_cookiePath = null;
+    private $_cookieDomain = null;
     private $_urlPath="/";
     private $_sessionLifetime=1800;
     private $_pdo=null;
@@ -151,7 +152,7 @@ class LoginService {
     * 
     * @return void
     */
-    public function init($path="/") {
+    public function init($path="/",$domain=null) {
         $this->_urlPath=$path;
         $secure = !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off';
         // Start the session
@@ -159,6 +160,7 @@ class LoginService {
         session_set_cookie_params([
             'lifetime' => $this->_sessionLifetime,
             'path' => $path==null ? '/' : $path,
+            'domain' => $domain,
             'secure' => $secure,
             'httponly' => $secure
         ]);
@@ -406,7 +408,7 @@ class LoginService {
         if ($rememberMe) {
             $cookieHash = $this->generateCookieHash($userId);
             $this->writeCookieData($cookieHash);
-            setcookie($this->_cookieName, $cookieHash, time() + $this->_inactivityTimeout, $this->_urlPath);
+            setcookie($this->_cookieName, $cookieHash, time() + $this->_inactivityTimeout, $this->_urlPath,$this->_cookieDomain);
         }
     }
 
@@ -431,7 +433,7 @@ class LoginService {
             $this->clearCookie($cookieHash);
         }
         // Delete remember me cookie
-        setcookie($this->_cookieName, '', time() - 3600,$this->_urlPath);
+        setcookie($this->_cookieName, '', time() - 3600,$this->_urlPath,$this->_cookieDomain);
         // Destroy session
         session_destroy();
     }
