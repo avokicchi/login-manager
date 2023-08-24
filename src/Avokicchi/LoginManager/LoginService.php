@@ -184,7 +184,7 @@ class LoginService {
                 // If userId exists, log the user in programmatically
                 $_SESSION['bag'] = $this->getBagFromCookie($cookieHash);
                 $this->clearCookie($cookieHash,"used");//old cookie, new one is already there
-                if ($userId) {
+                if ($userId!==false) {
                     $this->programmaticLogin($userId, true);
                 }
                 $_SESSION['secure'] = false;
