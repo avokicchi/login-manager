@@ -158,7 +158,7 @@ class LoginService {
         $secure = !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off';
         // Start the session
         ini_set('session.cookie_lifetime', $this->_sessionLifetime);
-        ini_set('session.name','SESSID'.strtoupper($this->_cookieName));
+        session_name('SESSID'.strtoupper($this->_cookieName));
         session_set_cookie_params([
             'lifetime' => $this->_sessionLifetime,
             'path' => $path==null ? '/' : $path,
@@ -166,7 +166,7 @@ class LoginService {
             'secure' => $secure,
             'httponly' => $secure
         ]);
-        session_start(['cookie_secure' => $secure,'cookie_httponly' => $secure]);
+        session_start(['cookie_secure' => $secure,'cookie_httponly' => $secure,'cookie_path' => $path==null ? '/' : $path]);
         // If user is not logged in with a session, but there is a cookie present,
         // Check if user is validly logged in using a cookie
 
