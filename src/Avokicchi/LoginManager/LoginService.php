@@ -158,6 +158,7 @@ class LoginService {
         $secure = !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off';
         // Start the session
         ini_set('session.cookie_lifetime', $this->_sessionLifetime);
+        ini_set('session.name','SESSID'.strtoupper($this->_cookieName));
         session_set_cookie_params([
             'lifetime' => $this->_sessionLifetime,
             'path' => $path==null ? '/' : $path,
