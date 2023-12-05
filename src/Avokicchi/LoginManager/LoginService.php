@@ -16,6 +16,7 @@ class LoginService {
     private $_urlPath="/";
     private $_sessionLifetime=1800;
     private $_pdo=null;
+	private $_extraCondition=null;
 
     private $_dbTable = "users";
 
@@ -121,6 +122,19 @@ class LoginService {
             return false;
         }
     }
+	
+	/**
+	* Add extra user condition
+	*
+	* If you need to add extra stuff to the condition to find a user
+	* Use this function.
+	*	
+	* @param string $condition	Extra WHERE condition (without where or and)
+	*
+	*/
+    public function setExtraCondition($condition) {
+		$this->_extraCondition = $condition;
+	}
 
     /**
     * Set inactivity timeout
@@ -328,7 +342,13 @@ class LoginService {
     public function verify($username, $password) {
         // Query database for user with matching username
         $username=trim($username);
-        $stmt = $this->_pdo->prepare("SELECT * FROM ".$this->_dbTable." WHERE ".$this->_dbFields["username"]." = :username");
+		
+		$query = "SELECT * FROM ".$this->_dbTable." WHERE ".$this->_dbFields["username"]." = :username";
+		if(!empty($this->_extraCondition)){
+			$query = $query . " AND ".$this->_extraCondition;
+		}
+		
+        $stmt = $this->_pdo->prepare($query);
         $stmt->execute([":username" => $username]);
         $user = $stmt->fetch(\PDO::FETCH_ASSOC);
         // Check if user was found
@@ -359,7 +379,13 @@ class LoginService {
     private function getUserIdByUsername($username) {
         $username=trim($username);
         // Query the database for the user ID
-        $stmt = $this->_pdo->prepare("SELECT * FROM ".$this->_dbTable." WHERE ".$this->_dbFields["username"]." = :username");
+		
+		$query = "SELECT * FROM ".$this->_dbTable." WHERE ".$this->_dbFields["username"]." = :username";
+		if(!empty($this->_extraCondition)){
+			$query = $query . " AND ".$this->_extraCondition;
+		}
+		
+        $stmt = $this->_pdo->prepare($query);
         $stmt->execute([":username" => $username]);
         $user = $stmt->fetch(\PDO::FETCH_ASSOC);
         // If the user was found, return the user ID
@@ -451,8 +477,14 @@ class LoginService {
         if ($this->isLoggedIn()) {
             // Get user id from session
             $userId = $_SESSION['user_id'];
-            // Query database for user details
-            $stmt = $this->_pdo->prepare("SELECT * FROM ".$this->_dbTable." WHERE ".$this->_dbFields["id"]." = :user_id");
+            // Query database for user details	
+			
+			$query = "SELECT * FROM ".$this->_dbTable." WHERE ".$this->_dbFields["id"]." = :user_id";
+			if(!empty($this->_extraCondition)){
+				$query = $query . " AND ".$this->_extraCondition;
+			}
+						
+            $stmt = $this->_pdo->prepare($query);
             $stmt->execute([":user_id" => $userId]);
             $user = $stmt->fetch(\PDO::FETCH_ASSOC);
             // Return user details as associative array
