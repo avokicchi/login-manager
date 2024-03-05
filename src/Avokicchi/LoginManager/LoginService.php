@@ -522,7 +522,7 @@ class LoginService {
         // Check if user ID is set in session
         if (isset($_SESSION['user_id'])) {
             // Verify user agent/ip
-            if (isset($_SESSION['ip']) && isset($_SESSION['user_agent']) && $_SESSION['user_agent'] === $_SERVER['HTTP_USER_AGENT'] && $_SESSION['ip']===$_SERVER['REMOTE_ADDR']) {
+            if (isset($_SESSION['ip']) && $_SESSION['user_agent'] === $_SERVER['HTTP_USER_AGENT'] && $_SESSION['ip']===$_SERVER['REMOTE_ADDR']) {
                 // User is logged in
                 return true;
             } else {
