@@ -12,7 +12,7 @@ class LoginService {
     private $_template;
     private $_cookieName = null;
     private $_cookiePath = null;
-    private $_cookieDomain = null;
+    private $_cookieDomain = '';
     private $_urlPath="/";
     private $_sessionLifetime=1800;
     private $_pdo=null;
@@ -41,7 +41,9 @@ class LoginService {
         $this->_cookiePath = __DIR__.DIRECTORY_SEPARATOR."..".DIRECTORY_SEPARATOR."..".DIRECTORY_SEPARATOR."..".DIRECTORY_SEPARATOR."cache".DIRECTORY_SEPARATOR."sessions".DIRECTORY_SEPARATOR;//outside your publicly shared documentroot.
         $this->_cookieName = $cookieName;
         $this->_cookiePath=str_replace("\\", "/", $this->_cookiePath);
-        @mkdir($this->_cookiePath,0777,true);
+        if(!is_dir($this->_cookiePath)){
+            @mkdir($this->_cookiePath,0777,true);
+        }
     }
 
     /**
@@ -166,7 +168,7 @@ class LoginService {
     * 
     * @return void
     */
-    public function init($path="/",$domain=null) {
+    public function init($path="/",$domain='') {
         $this->_urlPath=$path;
         $this->_cookieDomain=$domain;
         $secure = !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off';
