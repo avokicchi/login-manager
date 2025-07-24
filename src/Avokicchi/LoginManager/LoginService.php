@@ -175,13 +175,13 @@ class LoginService {
         // Start the session
         ini_set('session.cookie_lifetime', $this->_sessionLifetime);
         session_name('SESSID'.strtoupper($this->_cookieName));
-        session_set_cookie_params([
-            'lifetime' => $this->_sessionLifetime,
-            'path' => $path==null ? '/' : $path,
-            'domain' => $domain,
-            'secure' => $secure,
-            'httponly' => $secure
-        ]);
+	session_set_cookie_params(
+	    $this->_sessionLifetime,
+	    $path ?? '/',
+	    $domain,
+	    $secure,
+	    $secure // httponly
+	);
         session_start(['cookie_secure' => $secure,'cookie_httponly' => $secure,'cookie_path' => $path==null ? '/' : $path]);
         // If user is not logged in with a session, but there is a cookie present,
         // Check if user is validly logged in using a cookie
