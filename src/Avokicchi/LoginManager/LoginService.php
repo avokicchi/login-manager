@@ -28,9 +28,13 @@ class LoginService {
 
     private $_inactivityTimeout = 7 * 24 * 60 * 60;//one week
 
+    private $_debugLogs = false;
+    private $_logPath = null;
+    private $_requestId = null;
+
     /**
     * Instantiates the Login class.
-    * 
+    *
     * @param object $pdo            Database connection, \PDO object.
     * @param string $cookieName     name of your cookie.
     *
@@ -44,6 +48,49 @@ class LoginService {
         if(!is_dir($this->_cookiePath)){
             @mkdir($this->_cookiePath,0777,true);
         }
+        // Short per-request id so concurrent requests can be distinguished in the log.
+        try {
+            $this->_requestId = substr(bin2hex(random_bytes(4)), 0, 8);
+        } catch (\Exception $e) {
+            $this->_requestId = substr(md5(uniqid('', true)), 0, 8);
+        }
+    }
+
+    /**
+    * Enables/disables verbose logging to a file. Off by default.
+    *
+    * @param bool        $enabled  Turn logging on or off.
+    * @param string|null $logPath  Optional absolute path to the log file. Defaults to
+    *                              <cookiePath>/loginmanager.log (already outside the docroot).
+    *
+    * @return void
+    */
+    public function setDebugLogging($enabled, $logPath = null) {
+        $this->_debugLogs = (bool)$enabled;
+        if ($logPath !== null) {
+            $this->_logPath = $logPath;
+        }
+    }
+
+    /**
+    * Appends one line to the debug log when debug logging is enabled. No-op otherwise.
+    *
+    * @param string $text  The message.
+    *
+    * @return void
+    */
+    private function logText($text) {
+        if (!$this->_debugLogs) {
+            return;
+        }
+        $path = $this->_logPath ?: ($this->_cookiePath . "loginmanager.log");
+        $script = isset($_SERVER['SCRIPT_NAME']) ? $_SERVER['SCRIPT_NAME'] : '-';
+        $uri = isset($_SERVER['REQUEST_URI']) ? $_SERVER['REQUEST_URI'] : '-';
+        $pid = function_exists('getmypid') ? getmypid() : '-';
+        $line = "[" . $this->_requestId . " " . date("Y-m-d H:i:s") . " pid=" . $pid . "] "
+              . $script . " " . $uri . ": " . $text . "\n";
+        //LOCK_EX so concurrent requests don't interleave mid-line.
+        @file_put_contents($path, $line, FILE_APPEND | LOCK_EX);
     }
 
     /**
@@ -183,28 +230,89 @@ class LoginService {
 	    $secure // httponly
 	);
         session_start(['cookie_secure' => $secure,'cookie_httponly' => $secure,'cookie_path' => $path==null ? '/' : $path]);
-        // If user is not logged in with a session, but there is a cookie present,
-        // Check if user is validly logged in using a cookie
+
+        $this->logText("init() path=" . $path . " domain=" . $domain . " secure=" . ($secure ? '1' : '0')
+            . " sessionId=" . session_id()
+            . " hasRememberCookie=" . (isset($_COOKIE[$this->_cookieName]) ? '1' : '0')
+            . " sessionUserId=" . (isset($_SESSION['user_id']) ? $_SESSION['user_id'] : 'unset'));
+        //If user is not logged in with a session, but there is a cookie present,
+        //Check if user is validly logged in using a cookie
 
         if (isset($_COOKIE[$this->_cookieName]) && !$this->isLoggedIn()) {
             // Get the hash from the cookie
             $cookieHash = $_COOKIE[$this->_cookieName];
             $cookieHash = preg_replace("/[^A-Za-z0-9]/", '', $cookieHash);
-            // Log user out after a week of no activity.
-            $lastActivity = $this->getLastActivityFromCookie($cookieHash);
-            $weekAgo = time() - $this->_inactivityTimeout;
-            if ($lastActivity < $weekAgo) {
-                $this->logout();
+            $cookieFile = $this->_cookiePath . $cookieHash . ".txt";
+
+            $this->logText("cookie restore: attempting hash=" . $cookieHash);
+
+            //Lock the cookie file to serialize concurrent requests. Without this, two requests
+            //racing through init() could each delete the file and rotate the hash, causing one
+            //of them to read "no file" -> getLastActivity returns false -> intval(false)=0 ->
+            //treated as expired -> logout destroys the session for both.
+            if (!file_exists($cookieFile)) {
+                //File is gone (concurrent request already rotated it, or never existed).
+                //Skip restoration rather than logging the user out.
+                $this->logText("cookie restore: file does not exist for hash=" . $cookieHash . ", skipping (no logout)");
             } else {
-                // Retrieve the userId from the server file
-                $userId = $this->getUserIDFromCookie($cookieHash);
-                // If userId exists, log the user in programmatically
-                $_SESSION['bag'] = $this->getBagFromCookie($cookieHash);
-                $this->clearCookie($cookieHash,"used");//old cookie, new one is already there
-                if ($userId!==false) {
-                    $this->programmaticLogin($userId, true);
+                $fp = @fopen($cookieFile, 'r+');
+                if ($fp === false || !flock($fp, LOCK_EX)) {//flock is blocking; concurrent requests queue up.
+                    $this->logText("cookie restore: failed to open/lock file for hash=" . $cookieHash . ", skipping");
+                    if ($fp) fclose($fp);
+                } else {
+                    $size = filesize($cookieFile);
+                    $raw = $size > 0 ? fread($fp, $size) : '';
+                    $data = @unserialize($raw);
+                    //Track key presence separately from value: user_id=0 is a legitimate id in
+                    //some apps, and PHP treats 0 as falsy. A truthy check would log
+                    //out user 0 on every cookie restore.
+                    $hasUser = is_array($data) && array_key_exists("user_id", $data);
+                    $userId = $hasUser ? intval($data["user_id"]) : 0;
+                    $lastActivity = is_array($data) && isset($data["last_activity"]) ? intval($data["last_activity"]) : 0;
+                    $bag = is_array($data) && isset($data["bag"]) ? $data["bag"] : [];
+
+                    $weekAgo = time() - $this->_inactivityTimeout;
+                    $this->logText("cookie restore: hash=" . $cookieHash . " userId=" . $userId
+                        . " lastActivity=" . $lastActivity . " weekAgo=" . $weekAgo
+                        . " inactiveFor=" . (time() - $lastActivity) . "s"
+                        . " bagSize=" . (is_array($bag) ? count($bag) : 0));
+
+                    if ($lastActivity < $weekAgo) {
+                        $this->logText("cookie restore: EXPIRED (lastActivity " . $lastActivity . " < " . $weekAgo . "), calling logout()");
+                        flock($fp, LOCK_UN);
+                        fclose($fp);
+                        $this->logout();
+                    } elseif ($hasUser) {
+                        //Update last_activity in place, keep same hash. No rotation, no delete.
+                        $newData = [
+                            "user_id" => $userId,
+                            "last_activity" => time(),
+                            "bag" => $bag,
+                        ];
+                        ftruncate($fp, 0);
+                        rewind($fp);
+                        fwrite($fp, serialize($newData));
+                        fflush($fp);
+                        flock($fp, LOCK_UN);
+                        fclose($fp);
+
+                        //Restore session state directly instead of calling programmaticLogin,
+                        //which would generate a new cookie hash and a new file.
+                        $_SESSION['user_id'] = $userId;
+                        $_SESSION['user_agent'] = $_SERVER['HTTP_USER_AGENT'];
+                        $_SESSION['ip'] = $_SERVER['REMOTE_ADDR'];
+                        $_SESSION['bag'] = $bag;
+                        $_SESSION['secure'] = false;
+
+                        //Refresh the cookie expiration in the browser
+                        setcookie($this->_cookieName, $cookieHash, time() + $this->_inactivityTimeout, $this->_urlPath, $this->_cookieDomain);
+                        $this->logText("cookie restore: RESTORED userId=" . $userId . " hash=" . $cookieHash . " (no rotation)");
+                    } else {
+                        $this->logText("cookie restore: file had no valid userId for hash=" . $cookieHash . ", skipping");
+                        flock($fp, LOCK_UN);
+                        fclose($fp);
+                    }
                 }
-                $_SESSION['secure'] = false;
             }
         }
         if(!$this->isLoggedIn()) {
@@ -329,8 +437,34 @@ class LoginService {
             "bag" => isset($_SESSION['bag']) ? $_SESSION['bag'] : []
         ];
         $cookieHash = preg_replace("/[^A-Za-z0-9]/", '', $cookieHash);
-        $cookieFile = $this->_cookiePath. $cookieHash . ".txt"; 
-        file_put_contents($cookieFile, serialize($data));
+        $cookieFile = $this->_cookiePath. $cookieHash . ".txt";
+
+        //Lock for the read-modify-write so concurrent set()/programmaticLogin() calls don't
+        //clobber each other or leave the file half-written (which would unserialize to false and look like a missing/expired session
+        $fp = @fopen($cookieFile, 'c+');
+        if ($fp === false) {
+            return;
+        }
+        if (!flock($fp, LOCK_EX)) {
+            fclose($fp);
+            return;
+        }
+        //Merge with any existing bag on disk so a concurrent set() in another request
+        //isn't overwritten by our stale in-memory copy.
+        $size = filesize($cookieFile);
+        if ($size > 0) {
+            rewind($fp);
+            $existing = @unserialize(fread($fp, $size));
+            if (is_array($existing) && isset($existing["bag"]) && is_array($existing["bag"])) {
+                $data["bag"] = array_merge($existing["bag"], $data["bag"]);
+            }
+        }
+        ftruncate($fp, 0);
+        rewind($fp);
+        fwrite($fp, serialize($data));
+        fflush($fp);
+        flock($fp, LOCK_UN);
+        fclose($fp);
     }
 
     /**
@@ -440,6 +574,10 @@ class LoginService {
             $cookieHash = $this->generateCookieHash($userId);
             $this->writeCookieData($cookieHash);
             setcookie($this->_cookieName, $cookieHash, time() + $this->_inactivityTimeout, $this->_urlPath,$this->_cookieDomain);
+            $this->logText("programmaticLogin: userId=" . $userId . " rememberMe=1 newHash=" . $cookieHash
+                . " urlPath=" . $this->_urlPath . " domain=" . $this->_cookieDomain);
+        } else {
+            $this->logText("programmaticLogin: userId=" . $userId . " rememberMe=0 (no cookie set)");
         }
     }
 
@@ -449,6 +587,20 @@ class LoginService {
     * @return void
     */
     public function logout() {
+        if ($this->_debugLogs) {
+            // Caller info so we know what triggered the logout (hijack check, expiry, explicit, etc.).
+            $bt = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 3);
+            $caller = '<unknown>';
+            if (isset($bt[1])) {
+                $fn = isset($bt[1]['function']) ? $bt[1]['function'] : '?';
+                $cl = isset($bt[1]['class']) ? $bt[1]['class'] : '';
+                $ln = isset($bt[1]['line']) ? $bt[1]['line'] : (isset($bt[0]['line']) ? $bt[0]['line'] : '?');
+                $caller = ($cl ? $cl . '::' : '') . $fn . ' line ' . $ln;
+            }
+            $this->logText("logout() called from " . $caller
+                . " sessionUserId=" . (isset($_SESSION['user_id']) ? $_SESSION['user_id'] : 'unset')
+                . " hasRememberCookie=" . (isset($_COOKIE[$this->_cookieName]) ? '1' : '0'));
+        }
         // Clear session data
         $_SESSION = [];
         // Delete session cookie
@@ -529,6 +681,13 @@ class LoginService {
                 return true;
             } else {
                 // User agent mismatch, possible session hijacking attempt
+                $sessIp = isset($_SESSION['ip']) ? $_SESSION['ip'] : '<unset>';
+                $sessUa = isset($_SESSION['user_agent']) ? $_SESSION['user_agent'] : '<unset>';
+                $reqIp  = isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : '<unset>';
+                $reqUa  = isset($_SERVER['HTTP_USER_AGENT']) ? $_SERVER['HTTP_USER_AGENT'] : '<unset>';
+                $this->logText("isLoggedIn: HIJACK CHECK FAILED, calling logout()."
+                    . " session.ip=" . $sessIp . " request.ip=" . $reqIp
+                    . " session.ua=" . $sessUa . " request.ua=" . $reqUa);
                 $this->logout();
             }
         }
